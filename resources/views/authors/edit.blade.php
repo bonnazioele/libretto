@@ -4,12 +4,12 @@
 <div class="container">
     <div class="row justify-content-center">
         <div class="col-md-8">
-            <div class="card shadow">
-                <div class="card-header bg-primary text-white">
-                    <h4 class="mb-0">Edit Author: {{ $author->name }}</h4>
+            <div class="card">
+                <div class="card-header">
+                    <h4>Edit Author: {{ $author->name }}</h4>
                 </div>
                 <div class="card-body">
-                    <form method="POST" action="{{ route('authors.update', $author->id) }}">
+                    <form method="POST" action="{{ route('authors.update', $author) }}" enctype="multipart/form-data">
                         @csrf
                         @method('PUT')
 
@@ -24,8 +24,33 @@
                             @enderror
                         </div>
 
+                        <div class="mb-3">
+                            <label for="image" class="form-label">Author Image</label>
+                            @if($author->image)
+                                <div class="mb-2">
+                                    <img src="{{ $author->image_url }}" alt="{{ $author->name }}" 
+                                         class="img-thumbnail" style="max-height: 200px;">
+                                    <div class="form-check mt-2">
+                                        <input class="form-check-input" type="checkbox" 
+                                               id="remove_image" name="remove_image">
+                                        <label class="form-check-label" for="remove_image">
+                                            Remove current image
+                                        </label>
+                                    </div>
+                                </div>
+                            @endif
+                            <input type="file" class="form-control @error('image') is-invalid @enderror" 
+                                   id="image" name="image">
+                            @error('image')
+                                <div class="invalid-feedback">
+                                    {{ $message }}
+                                </div>
+                            @enderror
+                            <small class="text-muted">Leave blank to keep current image</small>
+                        </div>
+
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                            <a href="{{ route('authors.index') }}" class="btn btn-secondary me-md-2">Cancel</a>
+                            <a href="{{ route('authors.index') }}" class="btn btn-secondary">Cancel</a>
                             <button type="submit" class="btn btn-primary">Update Author</button>
                         </div>
                     </form>

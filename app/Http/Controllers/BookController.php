@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Support\Facades\Storage;
 use App\Models\Author;
 use App\Models\Book;
 use App\Models\Genre;
@@ -96,15 +97,24 @@ class BookController extends Controller
     }
 
     public function authorStore(Request $request)
-    {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-        ]);
+{
+    $validated = $request->validate([
+        'name' => 'required|string|max:255',
+        'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
+    ]);
 
-        Author::create($validated);
+    $author = new Author();
+    $author->name = $validated['name'];
 
-        return redirect()->route('authors.index')->with('success', 'Author created successfully!');
+    if ($request->hasFile('image')) {
+        $imagePath = $request->file('image')->store('authors', 'public');
+        $author->image = basename($imagePath);
     }
+
+    $author->save();
+
+    return redirect()->route('authors.index')->with('success', 'Author created!');
+}
 
     public function authorEdit(Author $author)
     {
@@ -112,15 +122,36 @@ class BookController extends Controller
     }
 
     public function authorUpdate(Request $request, Author $author)
-    {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-        ]);
+{
+    $validated = $request->validate([
+        'name' => 'required|string|max:255',
+        'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+        'remove_image' => 'nullable|boolean'
+    ]);
 
-        $author->update($validated);
+    $author->name = $validated['name'];
 
-        return redirect()->route('authors.index')->with('success', 'Author updated successfully!');
+    // Handle image removal
+    if ($request->has('remove_image') && $request->remove_image) {
+        Storage::disk('public')->delete('authors/' . $author->image);
+        $author->image = null;
     }
+
+    // Handle new image upload
+    if ($request->hasFile('image')) {
+        // Delete old image if exists
+        if ($author->image) {
+            Storage::disk('public')->delete('authors/' . $author->image);
+        }
+        
+        $imagePath = $request->file('image')->store('authors', 'public');
+        $author->image = basename($imagePath);
+    }
+
+    $author->save();
+
+    return redirect()->route('authors.index')->with('success', 'Author updated!');
+}
 
     public function authorDestroy(Author $author)
     {

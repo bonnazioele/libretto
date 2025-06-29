@@ -9,6 +9,7 @@
         </a>
     </div>
 
+    {{-- Flash messages --}}
     @if(session('success'))
         <div class="alert alert-success alert-dismissible fade show">
             {{ session('success') }}
@@ -34,7 +35,11 @@
             <tbody>
                 @foreach($authors as $author)
                 <tr>
-                    <td>{{ $author->name }}</td>
+                    <td>
+                        <img src="{{ $author->image_url }}" alt="{{ $author->name }}"
+                             class="rounded-circle me-2" style="width: 40px; height: 40px; object-fit: cover;">
+                        {{ $author->name }}
+                    </td>
                     <td>{{ $author->books_count }}</td>
                     <td>
                         <div class="btn-group btn-group-sm">
@@ -52,6 +57,7 @@
         </table>
     </div>
 
+    {{-- Pagination --}}
     <div class="mt-4">
         {{ $authors->links() }}
     </div>
