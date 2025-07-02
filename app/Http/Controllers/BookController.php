@@ -2,198 +2,256 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Book;
-use App\Models\Author;
-use App\Models\Genre;
-use App\Http\Requests\StoreBookRequest;
-use App\Http\Requests\UpdateBookRequest;
-use Illuminate\View\View;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Http\Request;  
+use App\Models\Author;
+use App\Models\Book;
+use App\Models\Genre;
+use App\Models\Review;
+use Illuminate\Http\Request;
 
 class BookController extends Controller
 {
-    public function index(): View
+   
+
+    // Book methods
+    public function index()
     {
-        return view('books.index', [
-            'books' => Book::with(['author', 'genres'])->latest()->paginate(10)
-        ]);
+        $books = Book::with(['author', 'genres', 'reviews'])->paginate(10);
+        return view('books.index', compact('books'));
     }
 
-    public function create(): View
+    public function create()
     {
-        return view('books.create', [
-            'authors' => Author::orderBy('name')->get(),
-            'genres' => Genre::orderBy('name')->get()
-        ]);
+        $authors = Author::all();
+        $genres = Genre::all();
+        return view('books.create', compact('authors', 'genres'));
     }
 
-    public function store(StoreBookRequest $request): RedirectResponse
+    public function store(Request $request)
     {
-        $validated = $request->validated();
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'author_id' => 'required|exists:authors,id',
+            'genres' => 'array',
+            'genres.*' => 'exists:genres,id'
+        ]);
+
+        $book = Book::create($validated);
         
-        $book = Book::create([
-            'title' => $validated['title'],
-            'author_id' => $validated['author_id']
-        ]);
-
         if (isset($validated['genres'])) {
             $book->genres()->attach($validated['genres']);
         }
 
-        return redirect()->route('books.index')
-            ->withSuccess('New book is added successfully.');
+        return redirect()->route('books.show', $book)->with('success', 'Book created successfully!');
     }
 
-    public function show(Book $book): View
+    public function show(Book $book)
     {
         $book->load(['author', 'genres', 'reviews']);
         return view('books.show', compact('book'));
     }
 
-    public function edit(Book $book): View
+    public function edit(Book $book)
     {
-        return view('books.edit', [
-            'book' => $book,
-            'authors' => Author::orderBy('name')->get(),
-            'genres' => Genre::orderBy('name')->get(),
-            'selectedGenres' => $book->genres->pluck('id')->toArray()
-        ]);
+        $authors = Author::all();
+        $genres = Genre::all();
+        return view('books.edit', compact('book', 'authors', 'genres'));
     }
 
-    public function update(UpdateBookRequest $request, Book $book): RedirectResponse
+    public function update(Request $request, Book $book)
     {
-        $validated = $request->validated();
-
-        $book->update([
-            'title' => $validated['title'],
-            'author_id' => $validated['author_id']
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'author_id' => 'required|exists:authors,id',
+            'genres' => 'array',
+            'genres.*' => 'exists:genres,id'
         ]);
 
-        $book->genres()->sync($validated['genres'] ?? []);
+        $book->update($validated);
+        
+        if (isset($validated['genres'])) {
+            $book->genres()->sync($validated['genres']);
+        } else {
+            $book->genres()->detach();
+        }
 
-        return redirect()->back()
-            ->withSuccess('Book is updated successfully.');
+        return redirect()->route('books.show', $book)->with('success', 'Book updated successfully!');
     }
 
-    public function destroy(Book $book): RedirectResponse
+    public function destroy(Book $book)
     {
         $book->delete();
-        return redirect()->route('books.index')
-            ->withSuccess('Book is deleted successfully.');
+        return redirect()->route('books.index')->with('success', 'Book deleted successfully!');
     }
 
-    // Add these methods to your existing BookController
+    // Author methods
+    public function authorIndex()
+    {
+        $authors = Author::paginate(10);
+        return view('authors.index', compact('authors'));
+    }
 
-public function authorIndex(): View
-{
-    return view('authors.index', [
-        'authors' => Author::withCount('books')->latest()->paginate(10)
-    ]);
-}
+    public function authorCreate()
+    {
+        return view('authors.create');
+    }
 
-public function authorCreate(): View
-{
-    return view('authors.create');
-}
-
-public function authorStore(Request $request): RedirectResponse
+    public function authorStore(Request $request)
 {
     $validated = $request->validate([
         'name' => 'required|string|max:255',
+        'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
     ]);
 
-    Author::create($validated);
+    $author = new Author();
+    $author->name = $validated['name'];
 
-    return redirect()->route('authors.index')
-        ->withSuccess('New author added successfully.');
+    if ($request->hasFile('image')) {
+        $imagePath = $request->file('image')->store('authors', 'public');
+        $author->image = basename($imagePath);
+    }
+
+    $author->save();
+
+    return redirect()->route('authors.index')->with('success', 'Author created!');
 }
 
-public function authorShow(Author $author): View
-{
-    $author->load('books'); // Eager load the books relationship
-    return view('authors.show', compact('author'));
-}
+    public function authorEdit(Author $author)
+    {
+        return view('authors.edit', compact('author'));
+    }
 
-public function genreIndex(): View
-{
-    return view('genres.index', [
-        'genres' => Genre::withCount('books')->latest()->paginate(10)
-    ]);
-}
-
-public function genreCreate(): View
-{
-    return view('genres.create');
-}
-
-public function genreStore(Request $request): RedirectResponse
+    public function authorUpdate(Request $request, Author $author)
 {
     $validated = $request->validate([
-        'name' => 'required|string|max:255|unique:genres',
+        'name' => 'required|string|max:255',
+        'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+        'remove_image' => 'nullable|boolean'
     ]);
 
-    Genre::create($validated);
+    $author->name = $validated['name'];
 
-    return redirect()->route('genres.index')
-        ->withSuccess('New genre added successfully.');
+    // Handle image removal
+    if ($request->has('remove_image') && $request->remove_image) {
+        Storage::disk('public')->delete('authors/' . $author->image);
+        $author->image = null;
+    }
+
+    // Handle new image upload
+    if ($request->hasFile('image')) {
+        // Delete old image if exists
+        if ($author->image) {
+            Storage::disk('public')->delete('authors/' . $author->image);
+        }
+        
+        $imagePath = $request->file('image')->store('authors', 'public');
+        $author->image = basename($imagePath);
+    }
+
+    $author->save();
+
+    return redirect()->route('authors.index')->with('success', 'Author updated!');
 }
 
-public function genreShow(Author $author): View
-{
-    $author->load('books'); // Eager load the books relationship
-    return view('genre.show', compact('genre'));
+    public function authorDestroy(Author $author)
+    {
+        if ($author->books()->count() > 0) {
+            return back()->with('error', 'Cannot delete author with existing books!');
+        }
+
+        $author->delete();
+        return redirect()->route('authors.index')->with('success', 'Author deleted successfully!');
+    }
+
+    // Genre methods
+    public function genreIndex()
+    {
+        $genres = Genre::paginate(10);
+        return view('genres.index', compact('genres'));
+    }
+
+    public function genreCreate()
+    {
+        return view('genres.create');
+    }
+
+    public function genreStore(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255|unique:genres',
+        ]);
+
+        Genre::create($validated);
+
+        return redirect()->route('genres.index')->with('success', 'Genre created successfully!');
+    }
+
+    public function genreEdit(Genre $genre)
+    {
+        return view('genres.edit', compact('genre'));
+    }
+
+    public function genreUpdate(Request $request, Genre $genre)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255|unique:genres,name,'.$genre->id,
+        ]);
+
+        $genre->update($validated);
+
+        return redirect()->route('genres.index')->with('success', 'Genre updated successfully!');
+    }
+
+    public function genreDestroy(Genre $genre)
+    {
+        if ($genre->books()->count() > 0) {
+            return back()->with('error', 'Cannot delete genre with existing books!');
+        }
+
+        $genre->delete();
+        return redirect()->route('genres.index')->with('success', 'Genre deleted successfully!');
+    }
+
+    // Review methods
+    public function reviewCreate(Book $book)
+    {
+        return view('reviews.create', compact('book'));
+    }
+
+    public function reviewStore(Request $request, Book $book)
+    {
+        $validated = $request->validate([
+            'content' => 'required|string',
+            'rating' => 'required|integer|between:1,5',
+        ]);
+
+        $book->reviews()->create($validated + ['user_id' => auth()->id()]);
+
+        return redirect()->route('books.show', $book)->with('success', 'Review added successfully!');
+    }
+
+    public function reviewEdit(Review $review)
+    {
+        return view('reviews.edit', compact('review'));
+    }
+
+    public function reviewUpdate(Request $request, Review $review)
+    {
+        $validated = $request->validate([
+            'content' => 'required|string',
+            'rating' => 'required|integer|between:1,5',
+        ]);
+
+        $review->update($validated);
+
+        return redirect()->route('books.show', $review->book)->with('success', 'Review updated successfully!');
+    }
+
+    public function reviewDestroy(Review $review)
+    {
+        $book = $review->book;
+        $review->delete();
+
+        return redirect()->route('books.show', $book)->with('success', 'Review deleted successfully!');
+    }
 }
-
-public function reviewCreate(Book $book): View
-{
-    return view('reviews.create', compact('book'));
-}
-
-public function reviewStore(Request $request, Book $book): RedirectResponse
-{
-    $validated = $request->validate([
-        'content' => 'required|string',
-        'rating' => 'required|integer|min:1|max:5',
-    ]);
-
-    // Create review with only the model's fillable fields
-    $book->reviews()->create([
-        'content' => $validated['content'],
-        'rating' => $validated['rating'],
-        // book_id is automatically set from the relationship
-    ]);
-
-    return redirect()->route('books.show', $book)
-        ->with('success', 'Review added successfully!');
-}
-
-public function reviewEdit(Review $review): View
-{
-    return view('reviews.edit', compact('review'));
-}
-
-public function reviewUpdate(Request $request, Review $review): RedirectResponse
-{
-    $validated = $request->validate([
-        'content' => 'required|string',
-        'rating' => 'required|integer|min:1|max:5',
-    ]);
-
-    $review->update($validated);
-
-    return redirect()->route('books.show', $review->book)
-        ->with('success', 'Review updated successfully!');
-}
-
-public function reviewDestroy(Review $review): RedirectResponse
-{
-    $book = $review->book;
-    $review->delete();
-
-    return redirect()->route('books.show', $book)
-        ->with('success', 'Review deleted successfully!');
-}
-}
-

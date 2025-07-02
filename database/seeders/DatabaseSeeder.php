@@ -11,7 +11,7 @@ class DatabaseSeeder extends Seeder
  public function run()
  {
  \App\Models\Author::factory(10)->create()->each(function ($author) {
- $books = \App\Models\Book::factory(3)->create(['author_id' => 
+ $books = \App\Models\Book::factory(3)->create(['author_id' =>
 $author->id]);
  $books->each(function ($book) {
  $genres = \App\Models\Genre::factory(2)->create();
@@ -21,3 +21,4 @@ $author->id]);
  });
  }
 }
+
