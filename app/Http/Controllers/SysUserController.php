@@ -12,17 +12,13 @@ use Illuminate\Validation\Rules\Password;
 
 class SysUserController extends Controller
 {
-    /**
-     * Show the user login form
-     */
+
     public function showLoginForm()
     {
         return view('auth.login');
     }
 
-    /**
-     * Handle user login
-     */
+
     public function login(Request $request)
     {
         $credentials = $request->validate([
@@ -41,17 +37,13 @@ class SysUserController extends Controller
         ])->onlyInput('email');
     }
 
-    /**
-     * Show the user registration form
-     */
+
     public function showRegistrationForm()
     {
         return view('auth.register');
     }
 
-    /**
-     * Handle user registration
-     */
+
     public function register(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -78,9 +70,7 @@ class SysUserController extends Controller
         return redirect('/books')->with('success', 'Registration successful!');
     }
 
-    /**
-     * Handle user logout
-     */
+  
     public function logout(Request $request)
     {
         Auth::logout();
@@ -91,18 +81,14 @@ class SysUserController extends Controller
         return redirect('/');
     }
 
-    /**
-     * Show user profile
-     */
+
     public function profile()
     {
         $user = Auth::user();
         return view('auth.profile', compact('user'));
     }
 
-    /**
-     * Update user profile
-     */
+  
     public function updateProfile(Request $request)
     {
         $user = Auth::user();
@@ -121,13 +107,13 @@ class SysUserController extends Controller
                 ->withInput();
         }
 
-        // Update basic info
+
         $user->name = $request->name;
         $user->email = $request->email;
 
-        // Handle avatar upload
+
         if ($request->hasFile('avatar')) {
-            // Delete old avatar if exists
+           
             if ($user->avatar) {
                 Storage::delete($user->avatar);
             }
@@ -136,7 +122,7 @@ class SysUserController extends Controller
             $user->avatar = $path;
         }
 
-        // Update password if provided
+  
         if ($request->new_password) {
             if (!Hash::check($request->current_password, $user->password)) {
                 return back()->withErrors([
@@ -151,9 +137,7 @@ class SysUserController extends Controller
         return redirect()->route('profile')->with('success', 'Profile updated successfully!');
     }
 
-    /**
-     * List all users (admin only)
-     */
+
     public function index()
     {
         $this->authorize('viewAny', User::class);
@@ -162,9 +146,6 @@ class SysUserController extends Controller
         return view('admin.users.index', compact('users'));
     }
 
-    /**
-     * Show user edit form (admin only)
-     */
     public function edit(User $user)
     {
         $this->authorize('update', $user);
@@ -172,9 +153,7 @@ class SysUserController extends Controller
         return view('admin.users.edit', compact('user'));
     }
 
-    /**
-     * Update user (admin only)
-     */
+
     public function update(Request $request, User $user)
     {
         $this->authorize('update', $user);
@@ -209,9 +188,7 @@ class SysUserController extends Controller
         return redirect()->route('admin.users.index')->with('success', 'User updated successfully!');
     }
 
-    /**
-     * Delete user (admin only)
-     */
+
     public function destroy(User $user)
     {
         $this->authorize('delete', $user);
